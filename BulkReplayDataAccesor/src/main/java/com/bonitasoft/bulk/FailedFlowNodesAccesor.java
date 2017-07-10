@@ -1,5 +1,6 @@
 package com.bonitasoft.bulk;
 
+import com.bonitasoft.bulk.beans.FailedFlowNodeType;
 import com.bonitasoft.engine.api.ProcessAPI;
 import com.bonitasoft.engine.api.TenantAPIAccessor;
 import org.bonitasoft.engine.bpm.connector.ConnectorInstance;
@@ -42,7 +43,7 @@ public class FailedFlowNodesAccesor {
     public Map<String, Map<String, Map<String, Serializable>>> searchFailedFlowNodes(APISession session, Long startDateMs, Long endDateMs) throws SearchException, BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, ConnectorInstanceNotFoundException {
         Map<String, Map<String, List<FlowNodeInstance>>> failedFlowNodes = new HashMap<String, Map<String, List<FlowNodeInstance>>>();
         getProcessDefinitions(session);
-        Map<String, Serializable> failedConnectors = searchFailedConnectors(session);
+        searchFailedConnectors(session);
 
         ProcessAPI p = TenantAPIAccessor.getProcessAPI(session);
 
@@ -154,12 +155,18 @@ public class FailedFlowNodesAccesor {
                 result = new HashMap<>();
                 List<FlowNodeInstance> lFn = fnTypeEntry.getValue().get(fnKey);
                 FlowNodeInstance reference = lFn.get(0);
+                result.put("fnKey", fnKey);
                 result.put("count", lFn.size());
                 result.put("name", reference.getName());
                 result.put("type", reference.getType());
                 if(reference.getType().equals(FailedFlowNodeType.CONNECTOR_ON_ACTIVITY.toString())){
 
                 }
+                List<Long> ids = new ArrayList<Long>();
+                for(FlowNodeInstance value :lFn){
+                    ids.add(value.getId());
+                }
+                result.put("ids", (Serializable)ids);
                 groupedResult.put(fnKey, result);
             }
             output.put(type, groupedResult);
@@ -178,8 +185,6 @@ public class FailedFlowNodesAccesor {
         Map<String, Serializable> map = new HashMap<String, Serializable>();
         tasksWithConnectors = new HashMap<Long, String>();
 
-        Set<String> exceptionMsg = new HashSet<>();
-
         for (ConnectorInstance connInst : connInsts) {
             String name = connInst.getName();
             Map<String, Serializable> connMap = (Map<String, Serializable>) map.get(name);
@@ -191,8 +196,7 @@ public class FailedFlowNodesAccesor {
                 connMap.put("id-containerId", new HashMap<Long, Long>());
                 ConnectorInstanceWithFailureInfo failData = p.getConnectorInstanceWithFailureInformation(connInst.getId());
                 connMap.put("exceptionMessage", failData.getExceptionMessage());
-                exceptionMsg.add(failData.getExceptionMessage());
-//                connMap.put("stackTrace", failData.getStackTrace());
+                connMap.put("stackTrace", failData.getStackTrace());
             }
             Map<Long, Long> ids = (Map<Long, Long>) connMap.get("id-containerId");
             ids.put(connInst.getId(), connInst.getContainerId());
@@ -205,8 +209,7 @@ public class FailedFlowNodesAccesor {
             connMap.put("count", count + 1);
             map.put(name, (Serializable) connMap);
         }
-        for(String s : exceptionMsg)
-            logger.warning(s);
+
         return map;
     }
 
