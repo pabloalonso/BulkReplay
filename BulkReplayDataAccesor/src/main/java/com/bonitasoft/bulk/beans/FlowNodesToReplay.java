@@ -15,6 +15,7 @@ import java.util.List;
  */
 public class FlowNodesToReplay {
     private String fnKey;
+    private String fnSet;
     private Long count;
     private String name;
     private List<Long> ids;
@@ -83,5 +84,13 @@ public class FlowNodesToReplay {
         String o = "";
         o += "Key: "+ fnKey + " | batchSize: " + batchSize + " | interval: " + interval + " | ids: " + ids.toString();
         return o;
+    }
+
+    public String getFnSet() {
+        return fnSet;
+    }
+
+    public void setFnSet(String fnSet) {
+        this.fnSet = fnSet;
     }
 }

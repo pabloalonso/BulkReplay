@@ -49,7 +49,7 @@ public class ReplayFlowNodes {
         parameters.put("ids", (Serializable) fntr.getIds());
         TenantAPIAccessor.getCommandAPI(apiSession).execute(ServletContextClass.COMMAND_NAME, parameters);
 
-        return Response.status(Response.Status.OK).entity(fntr.toString()).build();
+        return Response.status(Response.Status.OK).entity(fntr).build();
 
     }
 }
