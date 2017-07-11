@@ -33,11 +33,11 @@ public class ReplayCommandTest {
     private CommandAPI commandAPI;
     private static String COMMAND_NAME = "ReplayCommand";
 
-    //private boolean compile = true;
-    private boolean compile = false;
+    private boolean compile = true;
+    //private boolean compile = false;
 
 
-    //@AfterTest
+    @AfterTest
     public void tierDown(){
         if(compile)
             return;
@@ -81,7 +81,7 @@ public class ReplayCommandTest {
 
     }
 
-   // @Test
+    @Test
     public void testFileHandlerChange(){
         if(compile)
             return;
