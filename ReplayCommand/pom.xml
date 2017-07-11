@@ -7,6 +7,34 @@
     <groupId>com.bonitasoft.bulk</groupId>
     <artifactId>ReplayCommand</artifactId>
     <version>1.0</version>
-
+    <dependencies>
+        <dependency>
+            <groupId>org.bonitasoft.engine</groupId>
+            <artifactId>bonita-server</artifactId>
+            <version>${bonita.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.bonitasoft.engine</groupId>
+            <artifactId>bonita-client</artifactId>
+            <version>${bonita.version}</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.bonitasoft.bulk</groupId>
+            <artifactId>ReplayBonitaJob</artifactId>
+            <version>1.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <version>6.8.7</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <properties>
+        <bonita.version>6.5.3</bonita.version>
+    </properties>
 
 </project>

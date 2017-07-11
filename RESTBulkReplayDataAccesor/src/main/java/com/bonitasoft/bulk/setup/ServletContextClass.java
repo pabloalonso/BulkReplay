@@ -22,6 +22,7 @@ public class ServletContextClass implements ServletContextListener {
     public static String BONITA;
     public static String USERNAME;
     public static String PASSWORD;
+    public static String COMMAND_NAME;
     public static FailedFlowNodesAccesor failedFlowNodesAccesor;
 
     @Override
@@ -39,12 +40,14 @@ public class ServletContextClass implements ServletContextListener {
         this.BONITA = propsFromFile.getProperty("BONITA");
         this.USERNAME = propsFromFile.getProperty("USERNAME");
         this.PASSWORD = propsFromFile.getProperty("PASSWORD");
+        this.COMMAND_NAME = propsFromFile.getProperty("COMMAND_NAME");
 
         log.info("The following configuration will be used:");
         log.info("SERVER URL "+ SERVER_URL);
         log.info("BONITA "+ BONITA);
         log.info("USERNAME "+ USERNAME);
         log.info("PASSWORD "+ PASSWORD);
+        log.info("COMMAND_NAME "+ COMMAND_NAME);
 
         Map<String, String> settings = new HashMap<String, String>();
         settings.put("server.url", SERVER_URL);
