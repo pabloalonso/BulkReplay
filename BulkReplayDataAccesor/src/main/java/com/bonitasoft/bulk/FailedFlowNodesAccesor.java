@@ -3,6 +3,7 @@ package com.bonitasoft.bulk;
 import com.bonitasoft.bulk.beans.FailedFlowNodeType;
 import com.bonitasoft.engine.api.ProcessAPI;
 import com.bonitasoft.engine.api.TenantAPIAccessor;
+import com.bonitasoft.engine.bpm.process.impl.ProcessInstanceSearchDescriptor;
 import org.bonitasoft.engine.bpm.connector.ConnectorInstance;
 import org.bonitasoft.engine.bpm.connector.ConnectorInstanceNotFoundException;
 import org.bonitasoft.engine.bpm.connector.ConnectorInstanceWithFailureInfo;
@@ -10,10 +11,12 @@ import org.bonitasoft.engine.bpm.connector.ConnectorInstancesSearchDescriptor;
 import org.bonitasoft.engine.bpm.flownode.*;
 import org.bonitasoft.engine.bpm.process.ProcessDeploymentInfo;
 import org.bonitasoft.engine.bpm.process.ProcessDeploymentInfoCriterion;
+import org.bonitasoft.engine.bpm.process.ProcessInstance;
 import org.bonitasoft.engine.exception.BonitaHomeNotSetException;
 import org.bonitasoft.engine.exception.SearchException;
 import org.bonitasoft.engine.exception.ServerAPIException;
 import org.bonitasoft.engine.exception.UnknownAPITypeException;
+import org.bonitasoft.engine.search.Order;
 import org.bonitasoft.engine.search.SearchOptionsBuilder;
 import org.bonitasoft.engine.search.SearchResult;
 import org.bonitasoft.engine.session.APISession;
@@ -26,24 +29,121 @@ import java.util.logging.Logger;
  * Created by pablo on 04/07/2017.
  */
 public class FailedFlowNodesAccesor {
-    private  Map<Long, String> tasksWithConnectors;
+    /*
+    private  Map<Long, Map<String,Serializable>> tasksWithConnectors = new HashMap<Long, Map<String,Serializable>>();
     private  HashMap<Long, String> processDefinitions;
     private  final Set<String> usedProcessDefinitions = new HashSet<>();
+    */
     private final Logger logger = Logger.getLogger("com.bonitasoft.bulk");
 
     /**
-     *
-     * @param session Bonita API session
-     * @return
-     * @throws SearchException
+     * Method that will return the list of processes that have a task on failed on the last searchFailedFlowNodes, if no call done yet, it will return all of them
+     * @param session Bonita API Session
+     * @return Set of ProcessName and ProcessVersion
      * @throws BonitaHomeNotSetException
      * @throws ServerAPIException
      * @throws UnknownAPITypeException
      */
+    public  Set<String> getProcessUsedDefinitions(APISession session) throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException{
+        /* It will not be stateless and let several users t work with it
+        if(usedProcessDefinitions.size() > 0)
+            return usedProcessDefinitions;
+        else{
+            return new HashSet<String>(getProcessDefinitions(session));
+
+        }
+        */
+        return new HashSet<String>(getProcessDefinitions(session).values());
+    }
+
+    public List<Map<String, Serializable>> getDetailedConnectorInformation(APISession apiSession, List<Long> flowNodeIds) throws ConnectorInstanceNotFoundException, ServerAPIException, SearchException, BonitaHomeNotSetException, UnknownAPITypeException {
+        final Map<String, Map<String, Serializable>> errorMsgs = new HashMap<String, Map<String, Serializable>>();
+        Map<Long, Map<String,Serializable>> tasksWithConnectors = searchFailedConnectors(apiSession);
+        if(tasksWithConnectors.size() > 0){
+            for(Long flowNodeId : flowNodeIds){
+                Map<String, Serializable> connectorInfo = tasksWithConnectors.get(flowNodeId);
+                Map<String, Serializable> connector = errorMsgs.get(connectorInfo.get("exceptionMessage"));
+                if(connector == null){
+                    connectorInfo.put("count", 1L);
+                    errorMsgs.put((String)connectorInfo.get("exceptionMessage"), connectorInfo);
+                }else {
+                    connector.put("count", (Long)connector.get("count")+1);
+                    errorMsgs.put((String) connectorInfo.get("exceptionMessage"), connector);
+                }
+            }
+        }
+        return new ArrayList<Map<String, Serializable>>(errorMsgs.values());
+    }
+
+    public List<Map<String, Serializable>> searchHandlingGateways(APISession apiSession, Integer minutes, Long processDefinitionId) throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, SearchException {
+        ProcessAPI processApi = TenantAPIAccessor.getProcessAPI(apiSession);
+        SearchOptionsBuilder sob;
+        Long ms = System.currentTimeMillis() - (minutes*60*60*1000);
+        int size = 100;
+        int i = 0;
+        boolean pendingResults = true;
+        List<ProcessInstance> processInstanceList = new ArrayList<ProcessInstance>();
+        while(pendingResults){
+            sob = new SearchOptionsBuilder(i, size);
+            sob.lessOrEquals(ProcessInstanceSearchDescriptor.LAST_UPDATE, ms);
+            sob.and().filter(ProcessInstanceSearchDescriptor.PROCESS_DEFINITION_ID, processDefinitionId);
+            sob.sort(ProcessInstanceSearchDescriptor.PROCESS_DEFINITION_ID, Order.ASC);
+
+            List<ProcessInstance> result = processApi.searchProcessInstances(sob.done()).getResult();
+            processInstanceList.addAll(result);
+
+            if(result.size() < size){
+                pendingResults = false;
+            }else{
+                i = i + size;
+            }
+        }
+
+        Map<ProcessInstance,List<FlowNodeInstance>> handlingGatewayCases = new HashMap<ProcessInstance,List<FlowNodeInstance>>();
+
+        for(ProcessInstance processInstance : processInstanceList) {
+
+            sob = new SearchOptionsBuilder(0, 100);
+            sob.filter(FlowNodeInstanceSearchDescriptor.ROOT_PROCESS_INSTANCE_ID, processInstance.getRootProcessInstanceId());
+            sob.and().filter(FlowNodeInstanceSearchDescriptor.STATE_NAME, "executing");
+            List<FlowNodeInstance> l = processApi.searchFlowNodeInstances(sob.done()).getResult();
+            for(FlowNodeInstance f : l) {
+
+                if(f.getType().equals(FlowNodeType.GATEWAY)) {
+                    List<FlowNodeInstance> li = handlingGatewayCases.get(processInstance);
+                    if(li == null) {
+                        li = new ArrayList<FlowNodeInstance>();
+                    }
+                    li.add(f);
+                    handlingGatewayCases.put(processInstance, li);
+                }
+
+            }
+
+        }
+        return prepareHandlingGatewayCases(handlingGatewayCases);
+
+    }
+
+
+
+    /**
+     * Method that will return the failed Flownodes between 2 dates
+     * @param session Bonita API Session
+     * @param startDateMs Date min to perform the search (if null, no date filter will be applied)
+     * @param endDateMs Date max to perform the search (if null, it will not be limited)
+     * @return Complex structure that will be used by the display
+     * @throws SearchException
+     * @throws BonitaHomeNotSetException
+     * @throws ServerAPIException
+     * @throws UnknownAPITypeException
+     * @throws ConnectorInstanceNotFoundException
+     */
     public Map<String, Map<String, Map<String, Serializable>>> searchFailedFlowNodes(APISession session, Long startDateMs, Long endDateMs) throws SearchException, BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, ConnectorInstanceNotFoundException {
         Map<String, Map<String, List<FlowNodeInstance>>> failedFlowNodes = new HashMap<String, Map<String, List<FlowNodeInstance>>>();
-        getProcessDefinitions(session);
-        searchFailedConnectors(session);
+        HashMap<Long, String> processDefinitions = getProcessDefinitions(session);
+
+        Map<Long, Map<String,Serializable>> tasksWithConnectors = searchFailedConnectors(session);
 
         ProcessAPI p = TenantAPIAccessor.getProcessAPI(session);
 
@@ -85,9 +185,6 @@ public class FailedFlowNodesAccesor {
         }
         logger.info("Total num of retrieved FailedFlowNodes is " + fnis.size());
 
-
-
-
         for(FlowNodeInstance fni : fnis){
             FlowNodeType type = fni.getType();
             if(type.toString().contains("ACTIVITY_OTHER") || type.toString().contains("TASK")){
@@ -97,7 +194,7 @@ public class FailedFlowNodesAccesor {
                     if(connectors == null){
                         connectors = new HashMap<String, List<FlowNodeInstance>>();
                     }
-                    String key = generateConnectorTaskKey(fni);
+                    String key = generateConnectorTaskKey(fni,processDefinitions , tasksWithConnectors);
                     List<FlowNodeInstance> connector = connectors.get(key);
                     if(connector == null){
                         connector = new ArrayList<FlowNodeInstance>();
@@ -111,7 +208,7 @@ public class FailedFlowNodesAccesor {
                     if(tasks == null){
                         tasks = new HashMap<String, List<FlowNodeInstance>>();
                     }
-                    String key = generateFlowNodeKey(fni);
+                    String key = generateFlowNodeKey(fni, processDefinitions);
                     List<FlowNodeInstance> task = tasks.get(key);
                     if(task == null){
                         task = new ArrayList<FlowNodeInstance>();
@@ -126,7 +223,7 @@ public class FailedFlowNodesAccesor {
                 if(flowNodes == null){
                     flowNodes = new HashMap<String, List<FlowNodeInstance>>();
                 }
-                String key = generateFlowNodeKey(fni);
+                String key = generateFlowNodeKey(fni, processDefinitions);
                 List<FlowNodeInstance> flowNode = flowNodes.get(key);
                 if(flowNode == null){
                     flowNode = new ArrayList<FlowNodeInstance>();
@@ -137,31 +234,29 @@ public class FailedFlowNodesAccesor {
             }
         }
 
-        return prepareResponse(failedFlowNodes);
+        return prepareFailedFlowNodesResponse(failedFlowNodes);
 
     }
 
-    private Map<String,Map<String,Map<String,Serializable>>> prepareResponse(Map<String, Map<String, List<FlowNodeInstance>>> failedFlowNodes) {
+    private Map<String,Map<String,Map<String,Serializable>>> prepareFailedFlowNodesResponse(Map<String, Map<String, List<FlowNodeInstance>>> failedFlowNodes) {
 
-        Map<String, Serializable> result;
+        final Map<String,Map<String,Map<String,Serializable>>> output = new HashMap<>();
+
         Map<String, Map<String, Serializable>> groupedResult;
-        Map<String,Map<String,Map<String,Serializable>>> output = new HashMap<>();
-
+        Map<String, Serializable> result;
+        List<FlowNodeInstance> lFn;
         for(Map.Entry<String, Map<String, List<FlowNodeInstance>>> fnTypeEntry : failedFlowNodes.entrySet()){
             String type = fnTypeEntry.getKey();
             groupedResult = new HashMap<>();
             for(String fnKey : fnTypeEntry.getValue().keySet()){
 
                 result = new HashMap<>();
-                List<FlowNodeInstance> lFn = fnTypeEntry.getValue().get(fnKey);
+                lFn = fnTypeEntry.getValue().get(fnKey);
                 FlowNodeInstance reference = lFn.get(0);
                 result.put("fnKey", fnKey);
                 result.put("count", lFn.size());
                 result.put("name", reference.getName());
                 result.put("type", reference.getType());
-                if(reference.getType().equals(FailedFlowNodeType.CONNECTOR_ON_ACTIVITY.toString())){
-
-                }
                 List<Long> ids = new ArrayList<Long>();
                 for(FlowNodeInstance value :lFn){
                     ids.add(value.getId());
@@ -176,41 +271,47 @@ public class FailedFlowNodesAccesor {
         return output;
     }
 
-
-    private  Map<String,Serializable> searchFailedConnectors(APISession session) throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, SearchException, ConnectorInstanceNotFoundException {
-        ProcessAPI p = TenantAPIAccessor.getProcessAPI(session);
-        SearchOptionsBuilder sob = new SearchOptionsBuilder(0, Integer.MAX_VALUE);
-        sob.filter(ConnectorInstancesSearchDescriptor.STATE, "FAILED");
-        List<ConnectorInstance> connInsts = p.searchConnectorInstances(sob.done()).getResult();
-        Map<String, Serializable> map = new HashMap<String, Serializable>();
-        tasksWithConnectors = new HashMap<Long, String>();
-
-        for (ConnectorInstance connInst : connInsts) {
-            String name = connInst.getName();
-            Map<String, Serializable> connMap = (Map<String, Serializable>) map.get(name);
-            if (connMap == null) {
-                connMap = new HashMap<String, Serializable>();
-                connMap.put("connectorId", connInst.getConnectorId());
-                connMap.put("containerType", connInst.getContainerType());
-                connMap.put("name", name);
-                connMap.put("id-containerId", new HashMap<Long, Long>());
-                ConnectorInstanceWithFailureInfo failData = p.getConnectorInstanceWithFailureInformation(connInst.getId());
-                connMap.put("exceptionMessage", failData.getExceptionMessage());
-                connMap.put("stackTrace", failData.getStackTrace());
+    private List<Map<String, Serializable>> prepareHandlingGatewayCases(Map<ProcessInstance, List<FlowNodeInstance>> handlingCases) {
+        final List<Map<String, Serializable>> output = new ArrayList<Map<String, Serializable>>();
+        Map<String, Serializable> caseMap;
+        List<Long> idList;
+        for(Map.Entry<ProcessInstance, List<FlowNodeInstance>> caseEntry :handlingCases.entrySet()){
+            ProcessInstance processInstance = caseEntry.getKey();
+            caseMap = new HashMap<String, Serializable>();
+            caseMap.put("startDate", processInstance.getStartDate());
+            caseMap.put("lastUpdateDate", processInstance.getLastUpdate());
+            caseMap.put("rootCaseId", processInstance.getRootProcessInstanceId());
+            idList = new ArrayList<Long>();
+            for(FlowNodeInstance flowNodeInstance : caseEntry.getValue()){
+                idList.add(flowNodeInstance.getId());
             }
-            Map<Long, Long> ids = (Map<Long, Long>) connMap.get("id-containerId");
-            ids.put(connInst.getId(), connInst.getContainerId());
-            connMap.put("id-containerId", (Serializable) ids);
-            tasksWithConnectors.put(connInst.getContainerId(), name);
-            Long count = (Long) connMap.get("count");
-            if (count == null) {
-                count = 0L;
-            }
-            connMap.put("count", count + 1);
-            map.put(name, (Serializable) connMap);
+            caseMap.put("flowNodeIds", (Serializable)idList);
+            output.add(caseMap);
         }
+        return output;
+    }
 
-        return map;
+    private Map<Long, Map<String,Serializable>> searchFailedConnectors(APISession session) throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, SearchException, ConnectorInstanceNotFoundException {
+        final ProcessAPI processAPI = TenantAPIAccessor.getProcessAPI(session);
+        final SearchOptionsBuilder sob = new SearchOptionsBuilder(0, Integer.MAX_VALUE);
+        sob.filter(ConnectorInstancesSearchDescriptor.STATE, "FAILED");
+        final List<ConnectorInstance> connectorInstanceList = processAPI.searchConnectorInstances(sob.done()).getResult();
+        final Map<Long, Map<String,Serializable>> tasksWithConnectors = new HashMap<Long, Map<String,Serializable>>();
+        for (ConnectorInstance connectorInstance : connectorInstanceList) {
+            String name = connectorInstance.getName();
+            Map<String, Serializable> connectorMap = new HashMap<String, Serializable>();
+            connectorMap.put("connectorId", connectorInstance.getConnectorId());
+            connectorMap.put("containerType", connectorInstance.getContainerType());
+            connectorMap.put("name", name);
+            connectorMap.put("containerId", connectorInstance.getContainerId());
+            connectorMap.put("id", connectorInstance.getId());
+            ConnectorInstanceWithFailureInfo failData = processAPI.getConnectorInstanceWithFailureInformation(connectorInstance.getId());
+            connectorMap.put("exceptionMessage", failData.getExceptionMessage());
+            connectorMap.put("stackTrace", failData.getStackTrace());
+            tasksWithConnectors.put(connectorInstance.getContainerId(), connectorMap);
+        }
+        return tasksWithConnectors;
+
     }
 
     /**
@@ -218,42 +319,37 @@ public class FailedFlowNodesAccesor {
      * @param fni FlowNodeInstance
      * @return processName -- processVersion -- flowNodeType -- activityName -- connectorName
      */
-    private  String generateConnectorTaskKey(FlowNodeInstance fni){
-        String connectorName = tasksWithConnectors.get(fni.getId());
-        return generateFlowNodeKey(fni) +" -- "+ connectorName;
+    private  String generateConnectorTaskKey(FlowNodeInstance fni, HashMap<Long, String> processDefinitions, Map<Long, Map<String,Serializable>> tasksWithConnectors){
+        final String connectorName = (String) tasksWithConnectors.get(fni.getId()).get("name");
+        final String key = generateFlowNodeKey(fni, processDefinitions) +" -- "+ connectorName;
+        return key;
     }
 
     /**
      * Method that generates a key for a flowNode without a connector that failed
-     * @param fni FlowNodeInstance
+     * @param flowNodeInstance FlowNodeInstance
      * @return processName -- processVersion -- flowNodeType -- activityName -- connectorName
      */
-    private  String generateFlowNodeKey(FlowNodeInstance fni){
-        String process = processDefinitions.get(fni.getProcessDefinitionId());
-        String key = process +" -- "+ fni.getType().toString() +" -- "+ fni.getName();
-        usedProcessDefinitions.add(process);
+    private  String generateFlowNodeKey(FlowNodeInstance flowNodeInstance, HashMap<Long, String> processDefinitions){
+        final String process = processDefinitions.get(flowNodeInstance.getProcessDefinitionId());
+        final String key = process +" -- "+ flowNodeInstance.getType().toString() +" -- "+ flowNodeInstance.getName();
+        //usedProcessDefinitions.add(process);
         return key;
     }
-    public  Set<String> getProcessUsedDefinitions(APISession session) throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException{
-        if(usedProcessDefinitions.size() > 0)
-            return usedProcessDefinitions;
-        else{
-            return new HashSet<String>(getProcessDefinitions(session));
-        }
-    }
 
-    private  List<String> getProcessDefinitions(APISession session) throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException {
-        ProcessAPI p = TenantAPIAccessor.getProcessAPI(session);
-        List<ProcessDeploymentInfo> pds = p.getProcessDeploymentInfos(0, Integer.MAX_VALUE, ProcessDeploymentInfoCriterion.NAME_ASC);
-        processDefinitions = new HashMap<Long, String>();
-        List<String> processNames = new ArrayList<String>();
-        for(ProcessDeploymentInfo pd : pds){
-            String fullName = pd.getName() +" -- "+ pd.getVersion();
-            processDefinitions.put(pd.getProcessId(), fullName);
+
+    private HashMap<Long, String> getProcessDefinitions(APISession session) throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException {
+        final ProcessAPI p = TenantAPIAccessor.getProcessAPI(session);
+        final List<ProcessDeploymentInfo> processDeploymentInfoList = p.getProcessDeploymentInfos(0, Integer.MAX_VALUE, ProcessDeploymentInfoCriterion.NAME_ASC);
+        HashMap<Long, String> processDefinitions = new HashMap<Long, String>();
+        final List<String> processNames = new ArrayList<String>();
+        for(ProcessDeploymentInfo processDeploymentInfo : processDeploymentInfoList){
+            String fullName = processDeploymentInfo.getName() +" -- "+ processDeploymentInfo.getVersion();
+            processDefinitions.put(processDeploymentInfo.getProcessId(), fullName);
             processNames.add(fullName);
 
         }
-        return processNames;
+        return processDefinitions;
 
 
 
