@@ -13,7 +13,7 @@ import java.util.List;
  *  type: "GATEWAY"
  *  }
  */
-public class FlowNodesToReplay {
+public class FlowNodes {
     private String fnKey;
     private String fnSet;
     private Long count;
