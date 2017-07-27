@@ -8,7 +8,9 @@ import org.bonitasoft.engine.exception.BonitaHomeNotSetException;
 import org.bonitasoft.engine.exception.ServerAPIException;
 import org.bonitasoft.engine.exception.UnknownAPITypeException;
 import org.bonitasoft.engine.platform.LoginException;
+import org.bonitasoft.engine.platform.LogoutException;
 import org.bonitasoft.engine.session.APISession;
+import org.bonitasoft.engine.session.SessionNotFoundException;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -23,18 +25,13 @@ import java.util.Set;
 @Path("processes")
 public class Processes {
 
-    private APISession apiSession;
-
-    public void init() throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, LoginException {
-        LoginAPI loginAPI = TenantAPIAccessor.getLoginAPI();
-        apiSession = loginAPI.login(ServletContextClass.USERNAME, ServletContextClass.PASSWORD);
-    }
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getProcesses() throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, LoginException {
-        init();
-        Set<String> l = ServletContextClass.failedFlowNodesAccesor.getProcessUsedDefinitions(apiSession);
+    public Response getProcesses() throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, LoginException, LogoutException, SessionNotFoundException {
+        APISession apiSession = ServletContextClass.login();
+        Set<String> l = ServletContextClass.failedFlowNodesAccesor().getProcessUsedDefinitions(apiSession);
+        ServletContextClass.logout(apiSession);
         return Response.status(Response.Status.OK).entity(l).build();
     }
 }

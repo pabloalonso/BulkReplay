@@ -1,9 +1,9 @@
 package com.bonitasoft.bulk.rest;
 
-import com.bonitasoft.bulk.beans.FlowNodes;
+import com.bonitasoft.bulk.FailedFlowNodesAccesorExt;
+import com.bonitasoft.bulk.beans.ConnectorStats;
+import com.bonitasoft.bulk.beans.FlowNodeStats;
 import com.bonitasoft.bulk.setup.ServletContextClass;
-import com.bonitasoft.engine.api.LoginAPI;
-import com.bonitasoft.engine.api.TenantAPIAccessor;
 import org.bonitasoft.engine.bpm.connector.ConnectorInstanceNotFoundException;
 import org.bonitasoft.engine.exception.BonitaHomeNotSetException;
 import org.bonitasoft.engine.exception.SearchException;
@@ -17,23 +17,19 @@ import org.bonitasoft.engine.session.SessionNotFoundException;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.logging.Logger;
 
-/**
- * Created by pablo on 06/07/2017.
- */
-@Path("connector")
-public class Connector {
-
+@Path("deepFlowNodesStats")
+public class DeepFlowNodeStatsRest {
+    private final Logger logger = Logger.getLogger("com.bonitasoft.bulk.rest");
     @POST
     @Produces(MediaType.APPLICATION_JSON)
     @Consumes(MediaType.APPLICATION_JSON)
-    public Response getConnectorInformation(FlowNodes fns) throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, LoginException, SearchException, ConnectorInstanceNotFoundException, LogoutException, SessionNotFoundException {
+    public Response getDeepFlowNodeStats(FlowNodeStats flowNodeStats) throws UnknownAPITypeException, ServerAPIException, ConnectorInstanceNotFoundException, BonitaHomeNotSetException, SearchException, LoginException, LogoutException, SessionNotFoundException {
         APISession apiSession = ServletContextClass.login();
-        List<Map<String, Serializable>> l = ServletContextClass.failedFlowNodesAccesor().getDetailedConnectorInformation(apiSession, fns.getIds());
+        logger.severe(flowNodeStats.getFlowNodeIds().toString());
+        List<ConnectorStats> l = ((FailedFlowNodesAccesorExt) ServletContextClass.failedFlowNodesAccesor()).getDeepFlowNodeStats(apiSession, flowNodeStats.getFlowNodeIds());
         ServletContextClass.logout(apiSession);
         return Response.status(Response.Status.OK).entity(l).build();
     }

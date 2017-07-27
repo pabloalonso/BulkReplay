@@ -43,6 +43,11 @@
             <artifactId>genson</artifactId>
             <version>1.4</version>
         </dependency>
+        <dependency>
+            <groupId>org.bonitasoft.engine</groupId>
+            <artifactId>bonita-server</artifactId>
+            <version>6.5.3</version>
+        </dependency>
     </dependencies>
 
 
@@ -52,7 +57,7 @@
               <groupId>org.apache.maven.plugins</groupId>
               <artifactId>maven-war-plugin</artifactId>
               <configuration>
-                  <outputDirectory>C:\BonitaBPM\BonitaBPMSubscription-6.5.3\workspace\tomcat\webapps\</outputDirectory>
+                  <outputDirectory>C:\BonitaBPMSubscription-6.5.3\workspace\tomcat\webapps\</outputDirectory>
                   <!--<outputDirectory>C:\BonitaBPM\BonitaBPMSubscription-7.5.0\workspace\tomcat\server\webapps\</outputDirectory>-->
               </configuration>
           </plugin>

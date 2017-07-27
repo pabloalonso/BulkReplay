@@ -140,40 +140,40 @@ public class FailedFlowNodesAccesor {
      * @throws ConnectorInstanceNotFoundException
      */
     public Map<String, Map<String, Map<String, Serializable>>> searchFailedFlowNodes(APISession session, Long startDateMs, Long endDateMs) throws SearchException, BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, ConnectorInstanceNotFoundException {
+        System.out.println(System.currentTimeMillis());
+        System.out.println("Starting searchFailedFlowNodes");
         Map<String, Map<String, List<FlowNodeInstance>>> failedFlowNodes = new HashMap<String, Map<String, List<FlowNodeInstance>>>();
         HashMap<Long, String> processDefinitions = getProcessDefinitions(session);
-
+        System.out.println("Process Definition are: " + processDefinitions);
         Map<Long, Map<String,Serializable>> tasksWithConnectors = searchFailedConnectors(session);
-
+        //Map<Long, Map<String,Serializable>> tasksWithConnectors = new HashMap<>();
+        System.out.println("Getting Process API");
         ProcessAPI p = TenantAPIAccessor.getProcessAPI(session);
 
 
-        SearchOptionsBuilder sob = new SearchOptionsBuilder(0, 0);
-        sob.filter(FlowNodeInstanceSearchDescriptor.STATE_NAME, "FAILED");
-        if(startDateMs != null){
-            sob.and().greaterOrEquals(FlowNodeInstanceSearchDescriptor.LAST_UPDATE_DATE, startDateMs);
-        }
-        if(endDateMs != null){
-            sob.and().lessOrEquals(FlowNodeInstanceSearchDescriptor.LAST_UPDATE_DATE, endDateMs);
-        }
         List<FlowNodeInstance> fnis = new ArrayList<FlowNodeInstance>();
-        long total = p.searchFlowNodeInstances(sob.done()).getCount();
+        SearchOptionsBuilder sob;
         int size = 500;
         int i = 0;
         boolean pendingResults = true;
         while(pendingResults){
             sob = new SearchOptionsBuilder(i, size);
-            sob.filter(FlowNodeInstanceSearchDescriptor.STATE_NAME, "FAILED");
+
+            sob.filter(FlowNodeInstanceSearchDescriptor.STATE_NAME, "failed");
+            //sob.and().filter(FlowNodeInstanceSearchDescriptor.PROCESS_DEFINITION_ID, 5901031381694737294L);
+
             if(startDateMs != null){
                 sob.and().greaterOrEquals(FlowNodeInstanceSearchDescriptor.LAST_UPDATE_DATE, startDateMs);
             }
             if(endDateMs != null){
                 sob.and().lessOrEquals(FlowNodeInstanceSearchDescriptor.LAST_UPDATE_DATE, endDateMs);
             }
+            System.out.println("Calling API");
             SearchResult<FlowNodeInstance> result = p.searchFlowNodeInstances(sob.done());
+
             List<FlowNodeInstance> r = result.getResult();
             fnis.addAll(r);
-
+            System.out.println("Total num of FN " + result.getCount() + " readed " + fnis.size());
             if(r.size() < size){
 
                 pendingResults = false;
@@ -183,6 +183,7 @@ public class FailedFlowNodesAccesor {
                 i = i + size;
             }
         }
+        System.out.println("Total num of retrieved FailedFlowNodes is " + fnis.size());
         logger.info("Total num of retrieved FailedFlowNodes is " + fnis.size());
 
         for(FlowNodeInstance fni : fnis){
@@ -233,7 +234,7 @@ public class FailedFlowNodesAccesor {
                 failedFlowNodes.put(fni.getType().toString(), flowNodes);
             }
         }
-
+        System.out.println(System.currentTimeMillis());
         return prepareFailedFlowNodesResponse(failedFlowNodes);
 
     }
@@ -293,9 +294,26 @@ public class FailedFlowNodesAccesor {
 
     private Map<Long, Map<String,Serializable>> searchFailedConnectors(APISession session) throws BonitaHomeNotSetException, ServerAPIException, UnknownAPITypeException, SearchException, ConnectorInstanceNotFoundException {
         final ProcessAPI processAPI = TenantAPIAccessor.getProcessAPI(session);
-        final SearchOptionsBuilder sob = new SearchOptionsBuilder(0, Integer.MAX_VALUE);
-        sob.filter(ConnectorInstancesSearchDescriptor.STATE, "FAILED");
-        final List<ConnectorInstance> connectorInstanceList = processAPI.searchConnectorInstances(sob.done()).getResult();
+        SearchOptionsBuilder sob;
+        int size = 500;
+        boolean pendingResults = true;
+        final List<ConnectorInstance> connectorInstanceList = new ArrayList<>();
+        int i =0;
+        while(pendingResults) {
+            sob = new SearchOptionsBuilder(i, size);
+            sob.filter(ConnectorInstancesSearchDescriptor.STATE, "FAILED");
+            SearchResult<ConnectorInstance> r = processAPI.searchConnectorInstances(sob.done());
+            List<ConnectorInstance> result = r.getResult();
+            connectorInstanceList.addAll(result);
+            System.out.println("Total num of FN " + r.getCount() + " readed " + connectorInstanceList.size());
+            if(result.size() < size){
+                pendingResults = false;
+            }else{
+                i = i + size;
+            }
+        }
+        System.out.println("Total num of retrieved connectorInstance is " + connectorInstanceList.size());
+
         final Map<Long, Map<String,Serializable>> tasksWithConnectors = new HashMap<Long, Map<String,Serializable>>();
         for (ConnectorInstance connectorInstance : connectorInstanceList) {
             String name = connectorInstance.getName();
