@@ -40,15 +40,15 @@ public class ReplayFlowNodes {
 
         parameters.put("tenantId", 1);
         Long interval = fntr.getInterval();
-        if(interval < ServletContextClass.BULK_MIN_SECONDS){
-            logger.warning("Original interval of "+ interval + " has been overrided by the configured BULK_MIN_SECONDS: "+ ServletContextClass.BULK_MIN_SECONDS);
-            interval = ServletContextClass.BULK_MIN_SECONDS;
+        if(interval < ServletContextClass.getBulkMinSeconds()){
+            logger.warning("Original interval of "+ interval + " has been overrided by the configured BULK_MIN_SECONDS: "+ ServletContextClass.getBulkMinSeconds());
+            interval = ServletContextClass.getBulkMinSeconds();
         }
 
         Long batchSize = fntr.getBatchSize();
-        if(batchSize > ServletContextClass.BULK_MAX_BATCH_SIZE){
-            logger.warning("Original batchSize of "+ batchSize + " has been overrided by the configured BULK_MAX_BATCH_SIZE: "+ ServletContextClass.BULK_MAX_BATCH_SIZE);
-            batchSize = ServletContextClass.BULK_MAX_BATCH_SIZE;
+        if(batchSize > ServletContextClass.getBulkMaxBatchSize()){
+            logger.warning("Original batchSize of "+ batchSize + " has been overrided by the configured BULK_MAX_BATCH_SIZE: "+ ServletContextClass.getBulkMaxBatchSize());
+            batchSize = ServletContextClass.getBulkMaxBatchSize();
         }
 
         parameters.put("interval", interval);

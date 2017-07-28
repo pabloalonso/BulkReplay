@@ -44,15 +44,15 @@ public class DeleteCases {
 
         parameters.put("tenantId", 1);
         Long interval = stats.getInterval();
-        if(interval== null || interval < ServletContextClass.BULK_MIN_SECONDS){
-            logger.warning("Original interval of "+ interval + " has been overrided by the configured BULK_MIN_SECONDS: "+ ServletContextClass.BULK_MIN_SECONDS);
-            interval = ServletContextClass.BULK_MIN_SECONDS;
+        if(interval== null || interval < ServletContextClass.getBulkMinSeconds()){
+            logger.warning("Original interval of "+ interval + " has been overrided by the configured BULK_MIN_SECONDS: "+ ServletContextClass.getBulkMinSeconds());
+            interval = ServletContextClass.getBulkMinSeconds();
         }
 
         Long batchSize = stats.getBatchSize();
-        if(batchSize== null || batchSize > ServletContextClass.BULK_MAX_BATCH_SIZE){
-            logger.warning("Original batchSize of "+ batchSize + " has been overrided by the configured BULK_MAX_BATCH_SIZE: "+ ServletContextClass.BULK_MAX_BATCH_SIZE);
-            batchSize = ServletContextClass.BULK_MAX_BATCH_SIZE;
+        if(batchSize== null || batchSize > ServletContextClass.getBulkMaxBatchSize()){
+            logger.warning("Original batchSize of "+ batchSize + " has been overrided by the configured BULK_MAX_BATCH_SIZE: "+ ServletContextClass.getBulkMaxBatchSize());
+            batchSize = ServletContextClass.getBulkMaxBatchSize();
         }
 
         parameters.put("interval", interval);

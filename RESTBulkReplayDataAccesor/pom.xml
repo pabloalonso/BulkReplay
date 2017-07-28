@@ -48,6 +48,11 @@
             <artifactId>bonita-server</artifactId>
             <version>6.5.3</version>
         </dependency>
+        <dependency>
+            <groupId>org.bonitasoft.delivery</groupId>
+            <artifactId>BonitaBusinnesCalendars</artifactId>
+            <version>1.0.1</version>
+        </dependency>
     </dependencies>
 
 

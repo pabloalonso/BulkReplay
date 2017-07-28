@@ -29,8 +29,8 @@ import java.util.logging.Logger;
  */
 public class ServletContextClass implements ServletContextListener {
 
-    private final String CONFIG_PROPERTIES = "/config.properties";
-    private final Logger log = Logger.getLogger("com.bonitasoft.bulk");
+    private final static String CONFIG_PROPERTIES = "/config.properties";
+    private final Logger log = Logger.getLogger("com.bonitasoft.bulk.setup");
     private static String SERVER_URL;
     private static String BONITA;
     private static String USERNAME;
@@ -39,12 +39,55 @@ public class ServletContextClass implements ServletContextListener {
     private static FailedFlowNodesAccesor failedFlowNodesAccesor;
     private static String CAS_SERVICE;
     private static String CAS_TICKET;
-    public static Long BULK_MIN_SECONDS;
-    public static Long BULK_MAX_BATCH_SIZE;
+    private static Long BULK_MIN_SECONDS;
+    private static Long BULK_MAX_BATCH_SIZE;
     private static Integer AUTH_TYPE;
 
     public static String RETRY_COMMAND_NAME;
     public static String DELETE_COMMAND_NAME;
+    private static String CRUD_ENDPOINT;
+    private static String DSN_INFORMATION;
+
+    public static Long getBulkMinSeconds() {
+        final Properties propsFromFile = new Properties();
+        try {
+            propsFromFile.load(ServletContextClass.class.getClassLoader().getResourceAsStream(CONFIG_PROPERTIES));
+            return new Long(propsFromFile.getProperty("BULK_MIN_SECONDS"));
+        } catch (IOException e) {
+            return 3L;
+        }
+    }
+
+    public static Long getBulkMaxBatchSize() {
+        final Properties propsFromFile = new Properties();
+        try {
+            propsFromFile.load(ServletContextClass.class.getClassLoader().getResourceAsStream(CONFIG_PROPERTIES));
+            return new Long(propsFromFile.getProperty("BULK_MAX_BATCH_SIZE"));
+        } catch (IOException e) {
+            return 1L;
+        }
+    }
+
+    public static String getCrudEndpoint() {
+        final Properties propsFromFile = new Properties();
+        try {
+            propsFromFile.load(ServletContextClass.class.getClassLoader().getResourceAsStream(CONFIG_PROPERTIES));
+            return propsFromFile.getProperty("CRUD_ENDPOINT");
+        } catch (IOException e) {
+            return "http://gap2dbn01dev:8080/EPServices/rest/EPServices/document/A0698-F2115-S2342/";
+        }
+    }
+
+    public static String getDsnInformation() {
+        final Properties propsFromFile = new Properties();
+        try {
+            propsFromFile.load(ServletContextClass.class.getClassLoader().getResourceAsStream(CONFIG_PROPERTIES));
+
+            return propsFromFile.getProperty("DSN_INFORMATION");
+        } catch (IOException e) {
+            return "?informations=%7B_id%2CDeclarationSocialeNominative.Attributs.dateCreationContext%2CDeclarationSocialeNominative.Attributs.origine%2CDeclarationSocialeNominative.DSN.Envoi.codeEnvoi%2CDeclarationSocialeNominative.DSN.Envoi.Declaration.natureDeclaration%2CDeclarationSocialeNominative.DSN.Envoi.Declaration.typeDeclaration%2CDeclarationSocialeNominative.DSN.Envoi.Declaration.moisConcerne%2CDeclarationSocialeNominative.DSN.Envoi.Declaration.Entreprise.SIRENEntreprise%2CDeclarationSocialeNominative.DSN.Envoi.Declaration.Entreprise.NICEntreprise%2CDeclarationSocialeNominative.DSN.Envoi.Declaration.Entreprise.raisonSocialeEntreprise%2CDeclarationSocialeNominative.Attributs.statut%2CDeclarationSocialeNominative.Attributs.caseId%2C1%7D";
+        }
+    }
 
     @Override
     public void contextInitialized(ServletContextEvent servletContextEvent) {
@@ -60,13 +103,17 @@ public class ServletContextClass implements ServletContextListener {
             this.DELETE_COMMAND_NAME = propsFromFile.getProperty("DELETE_COMMAND_NAME");
 
 
+            this.CRUD_ENDPOINT = propsFromFile.getProperty("CRUD_ENDPOINT");
+            this.DSN_INFORMATION = propsFromFile.getProperty("DSN_INFORMATION");
+            this.BULK_MIN_SECONDS = new Long(propsFromFile.getProperty("BULK_MIN_SECONDS"));
+            this.BULK_MAX_BATCH_SIZE = new Long(propsFromFile.getProperty("BULK_MAX_BATCH_SIZE"));
+
             this.AUTH_TYPE = new Integer(propsFromFile.getProperty("AUTH_TYPE"));
             this.USERNAME = propsFromFile.getProperty("USERNAME");
             this.PASSWORD = propsFromFile.getProperty("PASSWORD");
             this.CAS_SERVICE = propsFromFile.getProperty("CAS_SERVICE");
             this.CAS_TICKET = propsFromFile.getProperty("CAS_TICKET");
-            this.BULK_MIN_SECONDS = new Long(propsFromFile.getProperty("BULK_MIN_SECONDS"));
-            this.BULK_MAX_BATCH_SIZE = new Long(propsFromFile.getProperty("BULK_MAX_BATCH_SIZE"));
+
 
 
             switch (AUTH_TYPE) {
